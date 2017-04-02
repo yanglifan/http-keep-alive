@@ -37,11 +37,11 @@ public class KeepAliveApplication {
     private static final Logger LOGGER = LoggerFactory.getLogger(KeepAliveApplication.class);
 
     private static final int CORE_POOL_SIZE = 100;
-    private static final int CONN_POOL_SIZE = 100;
+    private static final int CONN_POOL_SIZE = 10;
 
-    private static final String TEST_SERVICE_URL = "http://keepAliveService:8080/keep-alive/hello";
+    private static final String TEST_SERVICE_URL = "http://keepAliveService/keep-alive/hello";
 
-    @Autowired
+    @Autowired(required = false)
     private RestTemplate restTemplate;
 
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(CORE_POOL_SIZE);
@@ -94,6 +94,7 @@ public class KeepAliveApplication {
         return new CustomHttpComponentsClientHttpRequestFactory();
     }
 
+    @Profile("client")
     @Bean
     public RestTemplate restTemplate(ClientHttpRequestFactory clientHttpRequestFactory) {
         RestTemplate restTemplate = new RestTemplate();
