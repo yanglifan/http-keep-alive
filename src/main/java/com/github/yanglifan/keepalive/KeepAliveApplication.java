@@ -1,4 +1,4 @@
-package com.github.yanglifan;
+package com.github.yanglifan.keepalive;
 
 import okhttp3.ConnectionPool;
 import okhttp3.OkHttpClient;
@@ -13,43 +13,41 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.netflix.hystrix.dashboard.EnableHystrixDashboard;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.PostConstruct;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
-@EnableScheduling
+@EnableHystrixDashboard
+@EnableCircuitBreaker
 @SpringBootApplication
 public class KeepAliveApplication {
     private static final Logger LOGGER = LoggerFactory.getLogger(KeepAliveApplication.class);
 
     private static final int CORE_POOL_SIZE = 100;
-    private static final int CONN_POOL_SIZE = 10;
-
-    private static final String TEST_SERVICE_URL = "http://keepAliveService/keep-alive/hello";
-
-    @Autowired(required = false)
-    private RestTemplate restTemplate;
+    private static final int CONN_POOL_SIZE = 100;
+    private static final int DELAY_IN_SECONDS = 1000;
 
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(CORE_POOL_SIZE);
 
-    private AtomicInteger count = new AtomicInteger();
-
     // Not necessary
     private ConnectionPool okHttpConnectionPool = new ConnectionPool(5, 2, TimeUnit.MINUTES);
+
+    @Autowired(required = false)
+    private Client client;
 
     public static void main(String[] args) {
         SpringApplication.run(KeepAliveApplication.class, args);
@@ -61,19 +59,15 @@ public class KeepAliveApplication {
         LOGGER.info("Client runner startup");
         return (args) -> {
             for (int i = 0; i < CORE_POOL_SIZE; i++) {
+                Random random = new Random();
                 scheduler.scheduleAtFixedRate(() -> {
-                    String response = null;
+
                     try {
-                        response = restTemplate.getForObject(TEST_SERVICE_URL, String.class);
-                        count.incrementAndGet();
-                    } catch (RestClientException e) {
+                        client.call();
+                    } catch (Exception e) {
                         LOGGER.error(e.getMessage(), e);
                     }
-
-                    if (count.get() % 100 == 0) {
-                        LOGGER.info(response);
-                    }
-                }, 0, 100, TimeUnit.MILLISECONDS);
+                }, random.nextInt(DELAY_IN_SECONDS), DELAY_IN_SECONDS, TimeUnit.MILLISECONDS);
             }
         };
     }
